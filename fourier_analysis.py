@@ -5,7 +5,6 @@ import numpy as np
 import matplotlib.pyplot as plt
 from scipy.signal import stft, find_peaks
 
-
 # -----------------------------
 # PATHS
 # -----------------------------
@@ -42,16 +41,19 @@ FMAX_FFT_PICK = 5.0
 FMAX_PLOT_FALLBACK = 10.0
 
 #stft settings defined in seconds 
-WINDOW_SEC = 2.0 #seconds per stft window
-OVERLAP_SEC = 1.75 #seconds overlap
+# Needs optimization for values
+WINDOW_SEC = 15 #seconds per stft window
+OVERLAP_SEC = 14 #seconds overlap
+# WINDOW_SEC = 5 #seconds per stft window
+# OVERLAP_SEC = 4.5 #seconds overlap
 
 
 #log power epsilon floor
 EPS = 1e-12
 
 #fixed colour scale for comparisons (edit so use -70 and -10 for no epsilon)
-COLOUR_LIM_MIN = -85
-COLOUR_LIM_MAX = -35
+COLOUR_LIM_MIN = -70
+COLOUR_LIM_MAX = -10
 
 # -----------------------------
 # DATA LOADING
@@ -153,7 +155,7 @@ def stft_params_from_seconds(fs: float, window_sec: float, overlap_sec: float):
     noverlap = max(noverlap, 0)
     if noverlap >= nperseg:
         noverlap = nperseg - 1
-
+        
     return nperseg, noverlap
 
 # -----------------------------
@@ -174,10 +176,12 @@ def moving_fft(x: np.ndarray, fs: float, nperseg: int, noverlap: int):
         return_onesided=True,
         boundary=None,
         padded=False,
+        nfft = nperseg*5,
     )
 
     P = np.abs(Zxx) ** 2
     Z = 10.0 * np.log10(P + EPS)
+    
     return f, tt, Z
 
 
@@ -203,7 +207,13 @@ def plot_time_freq(
     outpath.parent.mkdir(parents=True, exist_ok=True)
 
     plt.figure(figsize=(10, 6))
-    plt.pcolormesh(tt, f, Z, shading="auto", vmin = vmin, vmax = vmax)
+    # cmap = 'YlOrBr'
+    # cmap = 'YlOrBr_r'
+    # cmap = 'hot'
+    # cmap = 'cividis'
+    # cmap = 'pink'
+    cmap = 'magma'
+    plt.pcolormesh(tt, f, Z, shading="auto",cmap=cmap, vmin = vmin, vmax = vmax)
     plt.xlabel("Time (s)")
     plt.ylabel("Frequency (Hz)")
     plt.title(title)
