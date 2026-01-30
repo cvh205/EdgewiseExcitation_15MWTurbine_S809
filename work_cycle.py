@@ -139,4 +139,4 @@ def main():
 
                     work_data = w_cycle(cl, cd, alpha, wind_val, 0.6, cm(cl,cd,0.6))
 
-                    print(f"{case} {wind} {struct} {model} : Work = {work_data:.4e}")
+                    plt.plot(alpha,work_data)
