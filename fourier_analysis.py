@@ -56,24 +56,15 @@ COLOUR_LIM_MIN = -70
 COLOUR_LIM_MAX = -10
 
 
-INTERACTIVE_DEBUG = True
+# -----------------------------
+# NORMALISATION CONSTANTS
+# -----------------------------
+ALPHA_AMPLITUDE_DEG = 10.45  # degrees
+ALPHA_AMPLITUDE_RAD = ALPHA_AMPLITUDE_DEG * np.pi / 180
+ALPHA_NORM = ALPHA_AMPLITUDE_RAD
+CL_NORM = 2 * np.pi * ALPHA_AMPLITUDE_RAD
+CD_NORM = CL_NORM * np.sin(ALPHA_AMPLITUDE_RAD)
 
-NORMALIZE_DATA = True
-
-DEBUG_CASES = {"Polar_Instability_Resonance"}   # only resonance
-DEBUG_WINDS = {"10ms", "30ms", "50ms"}          # all winds
-DEBUG_STRUCTS = {"Flex", "Rigid"}               # both
-DEBUG_MODELS = {"None", "Oye2", "IAGModel", "BeddoesIncomp"}  # all
-
-
-def is_debug_case(case: str, wind: str, struct: str, model: str) -> bool:
-    return (
-        INTERACTIVE_DEBUG
-        and (case in DEBUG_CASES)
-        and (wind in DEBUG_WINDS)
-        and (struct in DEBUG_STRUCTS)
-        and (model in DEBUG_MODELS)
-    )
 
 # -----------------------------
 # DATA LOADING
@@ -97,26 +88,26 @@ def infer_fs(t: np.ndarray) -> float:
         raise ValueError(f"Bad time step in data (dt={dt})")
     return 1.0 / dt
 
-
 # -----------------------------
-# NORMALIZATION FUNCTION
+# NORMALIsATION
 # -----------------------------
-def normalize_by_range(x: np.ndarray):
+def normalise_data(alpha: np.ndarray, cl: np.ndarray, cd: np.ndarray):
     """
-    Normalize by range (peak-to-peak amplitude).
+    Normalise alpha, cl, and cd by their respective normalisation constants.
     
     Args:
-        x: Input signal (already demeaned)
+        alpha: Angle of attack in radians
+        cl: Lift coefficient
+        cd: Drag coefficient
     
     Returns:
-        normalized signal, normalization_scale (the range value)
+        Normalised alpha, cl, cd
     """
-    x_range = np.max(x) - np.min(x)
-    if x_range > 1e-12:
-        return x / x_range, x_range
-    else:
-        return x, 1.0
-
+    alpha_normalised = alpha / ALPHA_NORM
+    cl_normalised = cl / CL_NORM
+    cd_normalised = cd / CD_NORM
+    
+    return alpha_normalised, cl_normalised, cd_normalised
 # -----------------------------
 # EXCITATION FREQUENCY PICKER
 # -----------------------------
@@ -273,98 +264,78 @@ def plot_time_freq(
     plt.savefig(outpath, dpi=200)
     plt.close()
 
-
-def plot_time_freq_ax(
-    ax,
+def plot_combined_time_freq(
     f: np.ndarray,
     tt: np.ndarray,
-    Z: np.ndarray,
-    title: str,
+    Z_alpha: np.ndarray,
+    Z_cl: np.ndarray,
+    Z_cd: np.ndarray,
+    case: str,
+    wind: str,
+    struct: str,
+    model: str,
+    outpath: Path,
     fmax: float,
     freq_lines=None,
     vmin: float = COLOUR_LIM_MIN,
     vmax: float = COLOUR_LIM_MAX,
-    cmap: str = "magma",
 ):
+    """
+    Create a combined plot with alpha, cl, and cd time-frequency plots stacked vertically.
+    All three parameters are normalized.
+    
+    freq_lines: list of (frequency_hz, label) tuples
+    """
     if fmax is not None:
         m = f <= fmax
         f = f[m]
-        Z = Z[m, :]
+        Z_alpha = Z_alpha[m, :]
+        Z_cl = Z_cl[m, :]
+        Z_cd = Z_cd[m, :]
 
-    im = ax.pcolormesh(
-        tt, f, Z,
-        shading="auto",
-        cmap=cmap,
-        vmin=vmin,
-        vmax=vmax,
-    )
+    outpath.parent.mkdir(parents=True, exist_ok=True)
 
-    ax.set_title(title)
-    ax.set_ylabel("Frequency (Hz)")
-
+    fig, axes = plt.subplots(3, 1, figsize=(12, 12), sharex=True)
+    cmap = 'magma'
+    
+    # Alpha plot
+    im0 = axes[0].pcolormesh(tt, f, Z_alpha, shading="auto", cmap=cmap, vmin=vmin, vmax=vmax)
+    axes[0].set_ylabel("Frequency (Hz)")
+    axes[0].set_title(f"{case} | {wind} | {struct} | {model} | alpha (normalised)")
+    cbar0 = plt.colorbar(im0, ax=axes[0])
+    cbar0.set_label("Log Power (dB)")
+    
+    # Cl plot
+    im1 = axes[1].pcolormesh(tt, f, Z_cl, shading="auto", cmap=cmap, vmin=vmin, vmax=vmax)
+    axes[1].set_ylabel("Frequency (Hz)")
+    axes[1].set_title(f"cl (normalised)")
+    cbar1 = plt.colorbar(im1, ax=axes[1])
+    cbar1.set_label("Log Power (dB)")
+    
+    # Cd plot
+    im2 = axes[2].pcolormesh(tt, f, Z_cd, shading="auto", cmap=cmap, vmin=vmin, vmax=vmax)
+    axes[2].set_ylabel("Frequency (Hz)")
+    axes[2].set_xlabel("Time (s)")
+    axes[2].set_title(f"cd (normalised)")
+    cbar2 = plt.colorbar(im2, ax=axes[2])
+    cbar2.set_label("Log Power (dB)")
+    
+    # Add frequency lines to all subplots
     if freq_lines:
         y_max = f[-1] if len(f) else None
         x0 = tt[0] if len(tt) else 0.0
-        for fr, label in freq_lines:
-            if y_max is None or fr > y_max:
-                continue
-            ax.axhline(fr, linestyle="--", linewidth=1)
-            ax.text(x0, fr, f" {label}", va="bottom")
+        for ax in axes:
+            for fr, label in freq_lines:
+                if y_max is None or fr > y_max:
+                    continue
+                ax.axhline(fr, linestyle="--", linewidth=1, color='white', alpha=0.5)
+                # Only add label to first subplot
+                if ax == axes[0]:
+                    ax.text(x0, fr, f" {label}", va="bottom", color='white')
 
-    return im
-
-def save_combined_timefreq_figure(
-    outpath: Path,
-    case: str, wind: str, struct: str, model: str,
-    f: np.ndarray, tt: np.ndarray,
-    Z_alpha: np.ndarray, Z_cl: np.ndarray, Z_cd: np.ndarray,
-    fmax_plot: float,
-    freq_lines=None,
-    vmin: float = COLOUR_LIM_MIN,
-    vmax: float = COLOUR_LIM_MAX,
-    cmap: str = "magma",
-    figsize=(10, 18),
-    dpi=200,
-    show: bool = False,
-
-):
-    outpath.parent.mkdir(parents=True, exist_ok=True)
-
-    fig, axs = plt.subplots(3, 1, figsize=figsize, sharex=True, sharey=True)
-
-    # Make room for the colorbar on the right (so it doesn't cover plots)
-    fig.subplots_adjust(right=0.86, hspace=0.25)
-
-    im = plot_time_freq_ax(
-        axs[0], f, tt, Z_alpha, title="alpha",
-        fmax=fmax_plot, freq_lines=freq_lines,
-        vmin=vmin, vmax=vmax, cmap=cmap
-    )
-    plot_time_freq_ax(
-        axs[1], f, tt, Z_cl, title="cl",
-        fmax=fmax_plot, freq_lines=freq_lines,
-        vmin=vmin, vmax=vmax, cmap=cmap
-    )
-    plot_time_freq_ax(
-        axs[2], f, tt, Z_cd, title="cd",
-        fmax=fmax_plot, freq_lines=freq_lines,
-        vmin=vmin, vmax=vmax, cmap=cmap
-    )
-
-    axs[2].set_xlabel("Time (s)")
-
-    fig.suptitle(f"{case} | {wind} | {struct} | {model}", fontsize=14)
-
-    # Put the colorbar OUTSIDE the axes
-    cax = fig.add_axes([0.88, 0.15, 0.02, 0.7])
-    cbar = fig.colorbar(im, cax=cax)
-    cbar.set_label("Log Power (dB)")
-
-    fig.savefig(outpath, dpi=dpi, bbox_inches="tight")
-
-    if show:
-        plt.show()  
-    plt.close(fig)
+    plt.tight_layout()
+    plt.savefig(outpath, dpi=200)
+    plt.close()
 
 
 # -----------------------------
@@ -377,19 +348,14 @@ def main():
     print()
     print(f"STFT window_sec={WINDOW_SEC:.3f}s overlap_sec={OVERLAP_SEC:.3f}s EPS={EPS:g}")
     print(f"ColoUr scale vmin={COLOUR_LIM_MIN} vmax={COLOUR_LIM_MAX}")
-    print(f"Normalization: {NORMALIZE_DATA} (dividing by range)")
+    print()
+    print(f"Normalisation constants:")
+    print(f"  ALPHA_NORM = {ALPHA_NORM:.6f} rad ({ALPHA_AMPLITUDE_DEG}°)")
+    print(f"  CL_NORM = {CL_NORM:.6f}")
+    print(f"  CD_NORM = {CD_NORM:.6f}")
     print()
 
-    #csv_rows = [["case", "wind", "struct", "model", "file", "fe_hz", "fmax_plot_hz"]]
-
-
-    csv_rows = [[
-    "case", "wind", "struct", "model", "file",
-    "fe_hz", "fmax_plot_hz",
-    "fs_hz", "nperseg", "noverlap",
-    "window_sec", "overlap_sec", "alpha_norm_scale",
-     "cl_norm_scale", "cd_norm_scale"
-    ]]
+    csv_rows = [["case", "wind", "struct", "model", "file", "fe_hz", "fmax_plot_hz"]]
 
     wrote_anything = False
     missing_count = 0
@@ -410,23 +376,13 @@ def main():
                     t, alpha, cl, cd = load_dat_file(fpath)
                     fs = infer_fs(t)
 
+                    # NORMALIsE the data
+                    alpha, cl, cd = normalise_data(alpha, cl, cd)
+
                     # reduce 0 Hz dominance by minusing the mean
                     alpha = alpha - np.mean(alpha)
                     cl = cl - np.mean(cl)
                     cd = cd - np.mean(cd)
-
-                    # Normalize each signal independently by its range
-                    if NORMALIZE_DATA:
-                        alpha_norm, alpha_scale = normalize_by_range(alpha)
-                        cl_norm, cl_scale = normalize_by_range(cl)
-                        cd_norm, cd_scale = normalize_by_range(cd)
-                        
-                        print(f"  Normalization scales: alpha={alpha_scale:.6f}, cl={cl_scale:.6f}, cd={cd_scale:.6f}")
-                    else:
-                        alpha_norm, cl_norm, cd_norm = alpha, cl, cd
-                        alpha_scale = cl_scale = cd_scale = 1.0
-
-                    
 
                     # robust f_e by finding lowest significant FFT peak
                     fe = estimate_excitation_frequency_from_alpha(
@@ -451,50 +407,42 @@ def main():
                     )
 
                     # STFT
-                    f, tt, Z_alpha = moving_fft(alpha_norm, fs, nperseg=nperseg, noverlap=noverlap)
-                    _, _, Z_cl = moving_fft(cl_norm, fs, nperseg=nperseg, noverlap=noverlap)
-                    _, _, Z_cd = moving_fft(cd_norm, fs, nperseg=nperseg, noverlap=noverlap)
+                    f, tt, Z_alpha = moving_fft(alpha, fs, nperseg=nperseg, noverlap=noverlap)
+                    _, _, Z_cl = moving_fft(cl, fs, nperseg=nperseg, noverlap=noverlap)
+                    _, _, Z_cd = moving_fft(cd, fs, nperseg=nperseg, noverlap=noverlap)
 
-
-                    # ---- combined figure (saved + optional show) ----
-                    base = OUT_DIR / case / wind / struct / model
-                    
-                    save_combined_timefreq_figure(
-                        outpath=base / "combined_timefreq.png",
-                        case=case, wind=wind, struct=struct, model=model,
-                        f=f, tt=tt,
-                        Z_alpha=Z_alpha, Z_cl=Z_cl, Z_cd=Z_cd,
-                        fmax_plot=fmax_plot,
-                        freq_lines=freq_lines,
-                        figsize=(10, 18),   # change to (10, 6) if you want same dimension as singles
-                        dpi=200,
-                        show=is_debug_case(case, wind, struct, model),
-
-                        )
-
-
-
-                    
                     base = OUT_DIR / case / wind / struct / model
 
                     plot_time_freq(
                         f, tt, Z_alpha,
-                        title=f"{case} | {wind} | {struct} | {model} | alpha",
+                        title=f"{case} | {wind} | {struct} | {model} | alpha (normalised)",
                         outpath=base / "alpha_timefreq.png",
                         fmax=fmax_plot,
                         freq_lines=freq_lines
                     )
                     plot_time_freq(
                         f, tt, Z_cl,
-                        title=f"{case} | {wind} | {struct} | {model} | cl",
+                        title=f"{case} | {wind} | {struct} | {model} | cl (normalised)",
                         outpath=base / "cl_timefreq.png",
                         fmax=fmax_plot,
                         freq_lines=freq_lines
                     )
                     plot_time_freq(
                         f, tt, Z_cd,
-                        title=f"{case} | {wind} | {struct} | {model} | cd",
+                        title=f"{case} | {wind} | {struct} | {model} | cd (normalised)",
                         outpath=base / "cd_timefreq.png",
+                        fmax=fmax_plot,
+                        freq_lines=freq_lines
+                    )
+
+                    # Create combined plot with all three parameters
+                    plot_combined_time_freq(
+                        f, tt, Z_alpha, Z_cl, Z_cd,
+                        case=case,
+                        wind=wind,
+                        struct=struct,
+                        model=model,
+                        outpath=base / "combined_timefreq.png",
                         fmax=fmax_plot,
                         freq_lines=freq_lines
                     )
@@ -512,9 +460,6 @@ def main():
                         str(noverlap),
                         f"{WINDOW_SEC:.3f}",
                         f"{OVERLAP_SEC:.3f}",
-                        f"{alpha_scale:.6f}",
-                        f"{cl_scale:.6f}",
-                        f"{cd_scale:.6f}",
                     ])
 
                     wrote_anything = True
@@ -530,11 +475,6 @@ def main():
         print("Excitation frequency summary CSV:", FREQ_CSV.resolve())
     else:
         print("No outputs written (all files were missing or skipped).")
-
-    
-   
-    
-
 
 
 if __name__ == "__main__":
