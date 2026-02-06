@@ -79,22 +79,29 @@ from fourier_analysis import normalise_data
 
 #reuse format from fourier analysis
 
-from EdgewiseExcitation_15MWTurbine_S809.Dataset.Our_DynStall_Model.AeroParameters_at_93m.Polar_Instability_Resonance #here i want 10ms,20ms,30ms then Rigid_DeddoesIncomp, Rigid_IAGModel, Rigid_None, Rigid_Oye2
+#from EdgewiseExcitation_15MWTurbine_S809.Dataset.Our_DynStall_Model.AeroParameters_at_93m.Polar_Instability_Resonance #here i want 10ms,20ms,30ms then Rigid_DeddoesIncomp, Rigid_IAGModel, Rigid_None, Rigid_Oye2
 
 from scipy import integrate
 import numpy as np
+import csv
+from pathlib import Path
 
-for n in EdgewiseExcitation_15MWTurbine_S809.Dataset.Our_DynStall_Model.AeroParameters_at_93m.Polar_Instability_Resonance:
-    data_{n} = np.loadcsv('n')
+directory = Path("C:Dataset \\ Our_DynStall_Model\\AeroParameters_at_93m\\Polar_Instability_Resonance")
 
-    print (data_{n})
+data = {}
+
+for n in directory.glob("*.dat"):
+    with open(n,newline='') as datfile:
+        data[n] = np.getfromtxt(datfile, delimiter=' ')
+        for row in data[n]:
+            print (row[:1])
 
 def work_per_cycle (cm):
 
     for cm_value in data:
         #integrate across data
 
-        W = 
+        W = 1
 
     return W
 
@@ -157,6 +164,16 @@ def main():
                     
                     wind_val = float(wind.replace("ms", ""))
 
-                    work_data = w_cycle(cl, cd, alpha, wind_val, 0.6, cm(cl,cd,0.6))
+                    #work_data = w_cycle(cl, cd, alpha, wind_val, 0.6, cm(cl,cd,0.6))
 
-                    plt.plot(alpha,work_data)
+                    #plt.plot(alpha,work_data)
+                    for n in directory.glob("*.csv"):
+                        with open(n,newline='') as csvfile:
+                            data[n] = csv.reader(csvfile, delimiter=' ',quotechar='|')
+                            for row in data[n]:
+                                print (row[:1])
+                    print("Directory exists:", directory.exists())
+                    
+
+if __name__ == "__main__":
+    main()
