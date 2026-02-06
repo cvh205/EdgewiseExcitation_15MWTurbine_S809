@@ -79,7 +79,9 @@ from fourier_analysis import normalise_data
 
 #reuse format from fourier analysis
 
-def cm(cl:np.ndarray,
+from EdgewiseExcitation_15MWTurbine_S809.Dataset.Our_DynStall_Model.AeroParameters_at_93m.Polar_Instability_Resonance #here i want 10ms,20ms,30ms then Rigid_DeddoesIncomp, Rigid_IAGModel, Rigid_None, Rigid_Oye2
+
+"""def cm(cl:np.ndarray,
        cd: np.ndarray,
        chord):
     #fix this, how do i calculate it?
@@ -108,7 +110,7 @@ def w_cycle (cd: np.ndarray,
     # Work over time history
     W = np.trapz(M, alpha)
     
-    return W
+    return W"""
     
 def main():
     csv_rows = [["case", "wind", "struct", "model", "file", "fe_hz", "fmax_plot_hz"]]
