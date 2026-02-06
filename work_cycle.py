@@ -179,7 +179,9 @@ def main():
                     
                     
                     
-                        print("Directory exists:", directory.exists())                   
+                        print("Directory exists:", directory.exists())    
+
+                        print("Hello World")               
 
 if __name__ == "__main__":
     main()
