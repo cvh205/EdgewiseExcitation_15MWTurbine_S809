@@ -81,6 +81,16 @@ from fourier_analysis import normalise_data
 
 from EdgewiseExcitation_15MWTurbine_S809.Dataset.Our_DynStall_Model.AeroParameters_at_93m.Polar_Instability_Resonance #here i want 10ms,20ms,30ms then Rigid_DeddoesIncomp, Rigid_IAGModel, Rigid_None, Rigid_Oye2
 
+def work_per_cycle (cm):
+    
+    for cm_value in data:
+        #integrate across data
+
+        W = 
+
+    return W
+
+
 """def cm(cl:np.ndarray,
        cd: np.ndarray,
        chord):
