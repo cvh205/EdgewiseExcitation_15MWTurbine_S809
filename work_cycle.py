@@ -85,9 +85,11 @@ from scipy import integrate
 import numpy as np
 import csv
 from pathlib import Path
+import os
+import pathlib
 
-directory = Path("C:Dataset \\ Our_DynStall_Model\\AeroParameters_at_93m\\Polar_Instability_Resonance")
 
+directory = (REPO_ROOT / "Dataset" / "EdgewiseExcited_IEA15MW_S809" / "AeroParameters_at_93m" / "Polar_Instability_Resonance")
 data = {}
 
 for n in directory.glob("*.dat"):
@@ -167,13 +169,17 @@ def main():
                     #work_data = w_cycle(cl, cd, alpha, wind_val, 0.6, cm(cl,cd,0.6))
 
                     #plt.plot(alpha,work_data)
-                    for n in directory.glob("*.csv"):
-                        with open(n,newline='') as csvfile:
-                            data[n] = csv.reader(csvfile, delimiter=' ',quotechar='|')
-                            for row in data[n]:
-                                print (row[:1])
-                    print("Directory exists:", directory.exists())
+
+                    for n in directory.rglob("*.dat"):
+                        
+                        data = np.loadtxt(n)
+                        print(n)
+                        print(data[:5, 1:])  # first column, first 5 rows
+
                     
+                    
+                    
+                        print("Directory exists:", directory.exists())                   
 
 if __name__ == "__main__":
     main()
